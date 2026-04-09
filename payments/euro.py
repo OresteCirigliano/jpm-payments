@@ -1,4 +1,4 @@
-from payments.utils import apply_common_filters, save_excel
+from payments.utils import apply_common_filters
 from openpyxl import Workbook
 import io
 
@@ -70,31 +70,37 @@ def generate(df, payment_date, month_full, country_code):
     # Arrotonda importo a 2 decimali
     df_g['total_amount'] = df_g['total_amount'].round(2)
 
-    # Mese in maiuscolo per colonna B (es. FEB COMM, MAR COMM)
+    # Mese in maiuscolo per colonna B (es. FEB COMM)
     month_upper = month_full[:3].upper()
 
-    # Costruisci righe — 5 colonne
+    # Costruisci righe con colonne nelle posizioni corrette:
+    # A=CustomerID, B=ID+mese+COMM, C=vuota, D=Importo,
+    # E=vuota, F=vuota, G=IBAN, H=vuota, I=Nome
     rows = []
     for _, rec in df_g.iterrows():
         pid = str(rec['partner_id']).strip()
         rows.append([
-            pid,
-            f"{pid} {month_upper} COMM",
-            rec['total_amount'],
-            str(rec['iban']).strip(),
-            str(rec['deposit_name']).strip(),
+            pid,                              # A - CustomerID
+            f"{pid} {month_upper} COMM",      # B - riferimento
+            '',                               # C - vuota
+            rec['total_amount'],              # D - importo
+            '',                               # E - vuota
+            '',                               # F - vuota
+            str(rec['iban']).strip(),         # G - IBAN
+            '',                               # H - vuota
+            str(rec['deposit_name']).strip(), # I - Nome
         ])
 
     num_tr    = len(df_g)
     total_eur = round(df_g['total_amount'].sum(), 2)
 
-    # Salva Excel — colonna D (IBAN=4) come testo
+    # Salva Excel — colonna G (IBAN=7) come testo
     wb = Workbook()
     ws = wb.active
     for row_idx, row in enumerate(rows, 1):
         for col_idx, value in enumerate(row, 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
-            if col_idx == 4 and value not in (None, ''):
+            if col_idx == 7 and value not in (None, ''):
                 cell.value = str(value)
                 cell.number_format = '@'
 
