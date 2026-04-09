@@ -9,7 +9,7 @@ from payments import gb, ch
 
 # ── Configurazione pagina ──────────────────────────────────
 st.set_page_config(
-    page_title="JPMorgan Payment Generator",
+    page_title="Commission File Generator",
     page_icon="💳",
     layout="centered"
 )
@@ -41,7 +41,7 @@ def save_log(entry):
         json.dump(log, f, indent=2)
 
 # ── UI ─────────────────────────────────────────────────────
-st.title("💳 JPMorgan Payment Generator")
+st.title("💳 Commission File Generator")
 st.markdown("---")
 
 # Caricamento file
@@ -54,7 +54,7 @@ if uploaded_file:
 st.markdown("---")
 
 # Parametri
-st.subheader("2. Parametri di pagamento")
+st.subheader("2. Parametri")
 
 col1, col2 = st.columns(2)
 
@@ -133,7 +133,7 @@ if st.button("▶ Genera file di pagamento", type="primary"):
 
 # ── Log ────────────────────────────────────────────────────
 st.markdown("---")
-st.subheader("📋 Storico pagamenti")
+st.subheader("📋 Storico file creati")
 
 log = load_log()
 if not log:
