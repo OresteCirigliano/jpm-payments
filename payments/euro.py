@@ -2,7 +2,21 @@ from payments.utils import apply_common_filters, save_excel
 from openpyxl import Workbook
 import io
 
-# Mappatura country code nel file EMEA → nome file output
+# Mappatura code app → code nel file EMEA
+COUNTRY_FILTER = {
+    'BE':  'BE',
+    'EIR': 'EIR',
+    'ES':  'ES',
+    'FI':  'FI',
+    'FR':  'FR',
+    'GER': 'DE',   # Nel file EMEA è DE
+    'IT':  'IT',
+    'LU':  'LU',
+    'NL':  'NL',
+    'OS':  'AT',   # Nel file EMEA è AT
+    'PT':  'PT',
+}
+
 EURO_COUNTRIES = {
     'BE':  'Belgium',
     'EIR': 'Ireland',
@@ -23,14 +37,12 @@ SODEXO_EXCLUDE = {'BE', 'NL'}
 def generate(df, payment_date, month_full, country_code):
     country_code = country_code.upper()
 
-    # Filtri comuni (PayableTy 0/10 + Field11)
-    df_c = apply_common_filters(df, country_code)
+    # Usa il codice corretto per filtrare il file EMEA
+    emea_code = COUNTRY_FILTER.get(country_code, country_code)
+    df_c = apply_common_filters(df, emea_code)
 
     # Escludi PayableTy 5 (Sodexo) per BE e NL
     if country_code in SODEXO_EXCLUDE:
-        df_c['PayableTy'] = df_c['PayableTy'].where(
-            df_c['PayableTy'].notna(), other=None
-        )
         df_c = df_c[df_c['PayableTy'] != 5]
 
     # Pulisci IBAN
