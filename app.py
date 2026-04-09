@@ -10,7 +10,7 @@ from payments.euro import generate as euro_generate, EURO_COUNTRIES
 
 # ── Configurazione pagina ──────────────────────────────────
 st.set_page_config(
-    page_title="JPMorgan Payment Generator",
+    page_title="Commission file generator",
     page_icon="💳",
     layout="centered"
 )
@@ -56,7 +56,7 @@ COUNTRY_OPTIONS = [
 EURO_CODES = set(EURO_COUNTRIES.keys())
 
 # ── UI ─────────────────────────────────────────────────────
-st.title("💳 JPMorgan Payment Generator")
+st.title("💳 Commission file generator")
 st.markdown("---")
 
 st.subheader("1. Carica il file EMEA")
@@ -65,7 +65,7 @@ if uploaded_file:
     st.success(f"✅ File caricato: **{uploaded_file.name}**")
 
 st.markdown("---")
-st.subheader("2. Parametri di pagamento")
+st.subheader("2. Parametri")
 
 col1, col2 = st.columns(2)
 
@@ -150,10 +150,10 @@ if st.button("▶ Genera file di pagamento", type="primary"):
 
 # ── Storico ────────────────────────────────────────────────
 st.markdown("---")
-st.subheader("📋 Storico pagamenti")
+st.subheader("📋 Storico File")
 log = load_log()
 if not log:
-    st.info("Nessun pagamento generato ancora.")
+    st.info("Nessun File generato ancora.")
 else:
     df_log = pd.DataFrame(log)
     df_log.columns = ["Data/Ora", "Paese", "Mese", "Data Pag.", "Transazioni", "Totale", "File Input", "File Output"]
