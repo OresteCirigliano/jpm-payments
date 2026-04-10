@@ -8,7 +8,6 @@ NORDIC_CONFIG = {
         'country':     'DK',
         'currency':    'DKK',
         'jpm_ref':     '550002687',
-        'iban_prefix': 'DK',
         'col_m':       '',
         'pmt_ref':     'full_month',
     },
@@ -17,7 +16,6 @@ NORDIC_CONFIG = {
         'country':     'SE',
         'currency':    'SEK',
         'jpm_ref':     '550002570',
-        'iban_prefix': 'SE',
         'col_m':       'NPG',
         'pmt_ref':     'id_only',
     },
@@ -26,7 +24,6 @@ NORDIC_CONFIG = {
         'country':     'NO',
         'currency':    'NOK',
         'jpm_ref':     '550002679',
-        'iban_prefix': 'NO',
         'col_m':       '',
         'pmt_ref':     'full_month',
     },
@@ -38,61 +35,70 @@ def generate(df, payment_date, month_full, country_code):
 
     df_c = apply_common_filters(df, country_code)
 
-    # Pulisci colonne
-    df_c['IBAN'] = df_c['IBAN'].astype(str).str.strip()
-    df_c['DepositRoutingNumber'] = df_c['DepositRoutingNumber'].astype(str).str.strip()
-    df_c['DepositAccountNumber'] = df_c['DepositAccountNumber'].astype(str).str.strip()
+    # Pulisci colonne — G=SwiftCode, H=IBAN (nel file EMEA)
+    df_c['SwiftCode'] = df_c['SwiftCode'].astype(str).str.strip()
+    df_c['IBAN']      = df_c['IBAN'].astype(str).str.strip()
 
-    # Escludi righe senza bank details validi
-    has_iban = df_c['IBAN'].str.upper().str.startswith(cfg['iban_prefix'])
-    has_account = (
-        (df_c['DepositAccountNumber'].str.upper() != 'NULL') &
-        (df_c['DepositAccountNumber'].str.upper() != 'NAN') &
-        (df_c['DepositAccountNumber'].str.strip('0') != '')
-    )
-    df_c = df_c[has_iban | has_account]
+    # Escludi righe dove colonna H (IBAN) è vuota/null/nan
+    df_c = df_c[
+        df_c['IBAN'].notna() &
+        (df_c['IBAN'].str.upper() != 'NULL') &
+        (df_c['IBAN'].str.upper() != 'NAN') &
+        (df_c['IBAN'].str.strip('0') != '')
+    ]
+
+    # Escludi righe dove colonna G (SwiftCode) è vuota/null/nan
+    df_c = df_c[
+        df_c['SwiftCode'].notna() &
+        (df_c['SwiftCode'].str.upper() != 'NULL') &
+        (df_c['SwiftCode'].str.upper() != 'NAN') &
+        (df_c['SwiftCode'] != '')
+    ]
 
     # Raggruppa per CustomerID
     df_g = df_c.groupby('effective_id').agg(
-        total_amount   = ('Amount',               'sum'),
-        deposit_name   = ('DepositName',          'first'),
-        iban           = ('IBAN',                 'first'),
-        routing_number = ('DepositRoutingNumber', 'first'),
-        account_number = ('DepositAccountNumber', 'first'),
+        total_amount = ('Amount',      'sum'),
+        deposit_name = ('DepositName', 'first'),
+        swift        = ('SwiftCode',   'first'),  # G: swift o sort code
+        iban_or_acct = ('IBAN',        'first'),  # H: IBAN o bank account
     ).reset_index()
-    df_g.columns = ['partner_id', 'total_amount', 'deposit_name',
-                    'iban', 'routing_number', 'account_number']
+    df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'swift', 'iban_or_acct']
 
-    # Escludi totali negativi o zero
     df_g = df_g[df_g['total_amount'] > 0]
 
-    # Pulisci e rimuovi righe senza bank details validi dopo il groupby
-    df_g['iban'] = df_g['iban'].astype(str).str.strip()
-    df_g['account_number'] = df_g['account_number'].astype(str).str.strip()
-    df_g['routing_number'] = df_g['routing_number'].astype(str).str.strip()
+    # Pulizia post-groupby
+    df_g['swift']        = df_g['swift'].astype(str).str.strip()
+    df_g['iban_or_acct'] = df_g['iban_or_acct'].astype(str).str.strip()
 
-    has_iban_g = df_g['iban'].str.upper().str.startswith(cfg['iban_prefix'])
-    has_account_g = (
-        (df_g['account_number'].str.upper() != 'NULL') &
-        (df_g['account_number'].str.upper() != 'NAN') &
-        (df_g['account_number'].str.strip('0') != '')
-    )
-    df_g = df_g[has_iban_g | has_account_g]
+    # Rimuovi righe con bank details non validi dopo groupby
+    df_g = df_g[
+        df_g['iban_or_acct'].notna() &
+        (df_g['iban_or_acct'].str.upper() != 'NULL') &
+        (df_g['iban_or_acct'].str.upper() != 'NAN') &
+        (df_g['iban_or_acct'].str.strip('0') != '') &
+        df_g['swift'].notna() &
+        (df_g['swift'].str.upper() != 'NULL') &
+        (df_g['swift'].str.upper() != 'NAN') &
+        (df_g['swift'] != '')
+    ]
 
     df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', cfg['company'], payment_date, '130000', '01100']]
 
     for _, rec in df_g.iterrows():
-        pid  = str(rec['partner_id']).strip()
-        iban = str(rec['iban']).strip()
+        pid        = str(rec['partner_id']).strip()
+        swift      = str(rec['swift']).strip()
+        iban_acct  = str(rec['iban_or_acct']).strip()
 
-        if iban.upper().startswith(cfg['iban_prefix']):
+        # Se SwiftCode inizia con lettera → è uno swift → F vuota, G = IBAN
+        # Se SwiftCode inizia con numero → è un sort code → F = sort code, G = bank account
+        if swift[0].isalpha():
             col_f = ''
-            col_g = iban.upper()
+            col_g = iban_acct.upper()
         else:
-            col_f = str(rec['routing_number']).strip()
-            col_g = str(rec['account_number']).strip()
+            col_f = swift
+            col_g = iban_acct
 
         if cfg['pmt_ref'] == 'id_only':
             pmt_ref = pid
