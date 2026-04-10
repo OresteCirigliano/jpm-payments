@@ -49,8 +49,8 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
         has_field11_block = any(v not in [3] for v in field11_vals if pd.notna(v))
 
         # Bank details
-        iban    = str(rows_cid['IBAN'].iloc[0]).strip()
-        acct    = str(rows_cid['DepositAccountNumber'].iloc[0]).strip()
+        iban    = str(rows['IBAN'].iloc[0]).strip()
+        acct    = str(rows['DepositAccountNumber'].iloc[0]).strip()
         routing = rows['DepositRoutingNumber'].astype(str).str.strip().iloc[0]
         has_bank = (
             (iban.upper() not in ('NULL', 'NAN', '')) or
