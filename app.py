@@ -209,5 +209,4 @@ if not log:
     st.info("Nessun pagamento generato ancora.")
 else:
     df_log = pd.DataFrame(log)
-    df_log.columns = ["Data/Ora", "Paese", "Mese", "Data Pag.", "Transazioni", "Totale", "Anomalie", "Status", "File Input", "File Output"]
     st.dataframe(df_log, use_container_width=True, hide_index=True)
