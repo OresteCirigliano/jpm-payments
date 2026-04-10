@@ -44,18 +44,15 @@ def generate(df, payment_date, month_full, country_code):
     df_c['DepositAccountNumber'] = df_c['DepositAccountNumber'].astype(str).str.strip()
 
     # Escludi righe senza bank details validi
-    df_c = df_c[
-        (
-            # Ha IBAN valido
-            df_c['IBAN'].str.upper().str.startswith(cfg['iban_prefix']) |
-            # Oppure ha account number valido
-            (
-                df_c['DepositAccountNumber'].str.upper() != 'NULL' &
-                df_c['DepositAccountNumber'].str.upper() != 'NAN' &
-                (df_c['DepositAccountNumber'].str.strip('0') != '')
-            )
-        )
-    ]
+has_iban = df_c['IBAN'].str.upper().str.startswith(cfg['iban_prefix'])
+
+has_account = (
+    (df_c['DepositAccountNumber'].str.upper() != 'NULL') &
+    (df_c['DepositAccountNumber'].str.upper() != 'NAN') &
+    (df_c['DepositAccountNumber'].str.strip('0') != '')
+)
+
+df_c = df_c[has_iban | has_account]
 
     # Raggruppa per CustomerID
     df_g = df_c.groupby('effective_id').agg(
