@@ -63,8 +63,23 @@ def generate(df, payment_date, month_full, country_code):
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name',
                     'iban', 'routing_number', 'account_number']
 
-    df_g = df_g[df_g['total_amount'] > 0]
-    df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
+df_g = df_g[df_g['total_amount'] > 0]
+
+# Rimuovi righe con IBAN e account non validi dopo il groupby
+df_g['iban'] = df_g['iban'].astype(str).str.strip()
+df_g['account_number'] = df_g['account_number'].astype(str).str.strip()
+df_g['routing_number'] = df_g['routing_number'].astype(str).str.strip()
+
+df_g = df_g[
+    df_g['iban'].str.upper().str.startswith(cfg['iban_prefix']) |
+    (
+        (df_g['account_number'].str.upper() != 'NULL') &
+        (df_g['account_number'].str.upper() != 'NAN') &
+        (df_g['account_number'].str.strip('0') != '')
+    )
+]
+
+df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', cfg['company'], payment_date, '130000', '01100']]
 
