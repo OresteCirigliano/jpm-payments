@@ -11,7 +11,7 @@ from payments.nordic import generate as nordic_generate
 
 # ── Configurazione pagina ──────────────────────────────────
 st.set_page_config(
-    page_title="JPMorgan Payment Generator",
+    page_title="Commission File Generator",
     page_icon="💳",
     layout="centered"
 )
@@ -61,7 +61,7 @@ EURO_CODES   = set(EURO_COUNTRIES.keys())
 NORDIC_CODES = {'DK', 'SE', 'NO'}
 
 # ── UI ─────────────────────────────────────────────────────
-st.title("💳 JPMorgan Payment Generator")
+st.title("💳 Commission File Generator")
 st.markdown("---")
 
 st.subheader("1. Carica il file EMEA")
@@ -70,7 +70,7 @@ if uploaded_file:
     st.success(f"✅ File caricato: **{uploaded_file.name}**")
 
 st.markdown("---")
-st.subheader("2. Parametri di pagamento")
+st.subheader("2. Parametri per il file")
 
 col1, col2 = st.columns(2)
 
