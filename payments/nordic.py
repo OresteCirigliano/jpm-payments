@@ -4,30 +4,33 @@ import io
 
 NORDIC_CONFIG = {
     'DK': {
-        'company':     'TJPCAPSDKK',
-        'country':     'DK',
-        'currency':    'DKK',
-        'jpm_ref':     '550002687',
-        'col_m':       '',
-        'pmt_ref':     'full_month',
+        'company':  'TJPCAPSDKK',
+        'country':  'DK',
+        'currency': 'DKK',
+        'jpm_ref':  '550002687',
+        'col_m':    '',
+        'pmt_ref':  'full_month',
     },
     'SE': {
-        'company':     'TJPCAPSSEK',
-        'country':     'SE',
-        'currency':    'SEK',
-        'jpm_ref':     '550002570',
-        'col_m':       'NPG',
-        'pmt_ref':     'id_only',
+        'company':  'TJPCAPSSEK',
+        'country':  'SE',
+        'currency': 'SEK',
+        'jpm_ref':  '550002570',
+        'col_m':    'NPG',
+        'pmt_ref':  'id_only',
     },
     'NO': {
-        'company':     'TJPCAPSNOK',
-        'country':     'NO',
-        'currency':    'NOK',
-        'jpm_ref':     '550002679',
-        'col_m':       '',
-        'pmt_ref':     'full_month',
+        'company':  'TJPCAPSNOK',
+        'country':  'NO',
+        'currency': 'NOK',
+        'jpm_ref':  '550002679',
+        'col_m':    '',
+        'pmt_ref':  'full_month',
     },
 }
+
+def is_empty(val):
+    return str(val).strip().upper() in ('', 'NULL', 'NAN', 'NONE')
 
 def generate(df, payment_date, month_full, country_code):
     country_code = country_code.upper()
@@ -35,32 +38,24 @@ def generate(df, payment_date, month_full, country_code):
 
     df_c = apply_common_filters(df, country_code)
 
-    # Pulisci colonne — G=SwiftCode, H=IBAN (nel file EMEA)
+    # Pulisci colonne G (SwiftCode) e H (IBAN/account)
     df_c['SwiftCode'] = df_c['SwiftCode'].astype(str).str.strip()
     df_c['IBAN']      = df_c['IBAN'].astype(str).str.strip()
 
-    # Escludi righe dove colonna H (IBAN) è vuota/null/nan
-    df_c = df_c[
-        df_c['IBAN'].notna() &
-        (df_c['IBAN'].str.upper() != 'NULL') &
-        (df_c['IBAN'].str.upper() != 'NAN') &
-        (df_c['IBAN'].str.strip('0') != '')
-    ]
+    # Escludi righe dove H (IBAN/account) è vuota
+    df_c = df_c[~df_c['IBAN'].apply(is_empty)]
 
-    # Escludi righe dove colonna G (SwiftCode) è vuota/null/nan
-    df_c = df_c[
-        df_c['SwiftCode'].notna() &
-        (df_c['SwiftCode'].str.upper() != 'NULL') &
-        (df_c['SwiftCode'].str.upper() != 'NAN') &
-        (df_c['SwiftCode'] != '')
-    ]
+    # Escludi righe dove G (SwiftCode) è vuota E IBAN non inizia con prefisso paese
+    has_valid_swift   = ~df_c['SwiftCode'].apply(is_empty)
+    has_direct_iban   = df_c['IBAN'].str.upper().str.startswith(country_code)
+    df_c = df_c[has_valid_swift | has_direct_iban]
 
     # Raggruppa per CustomerID
     df_g = df_c.groupby('effective_id').agg(
         total_amount = ('Amount',      'sum'),
         deposit_name = ('DepositName', 'first'),
-        swift        = ('SwiftCode',   'first'),  # G: swift o sort code
-        iban_or_acct = ('IBAN',        'first'),  # H: IBAN o bank account
+        swift        = ('SwiftCode',   'first'),
+        iban_or_acct = ('IBAN',        'first'),
     ).reset_index()
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'swift', 'iban_or_acct']
 
@@ -71,29 +66,23 @@ def generate(df, payment_date, month_full, country_code):
     df_g['iban_or_acct'] = df_g['iban_or_acct'].astype(str).str.strip()
 
     # Rimuovi righe con bank details non validi dopo groupby
-    df_g = df_g[
-        df_g['iban_or_acct'].notna() &
-        (df_g['iban_or_acct'].str.upper() != 'NULL') &
-        (df_g['iban_or_acct'].str.upper() != 'NAN') &
-        (df_g['iban_or_acct'].str.strip('0') != '') &
-        df_g['swift'].notna() &
-        (df_g['swift'].str.upper() != 'NULL') &
-        (df_g['swift'].str.upper() != 'NAN') &
-        (df_g['swift'] != '')
-    ]
+    df_g = df_g[~df_g['iban_or_acct'].apply(is_empty)]
+    has_valid_swift_g = ~df_g['swift'].apply(is_empty)
+    has_direct_iban_g = df_g['iban_or_acct'].str.upper().str.startswith(country_code)
+    df_g = df_g[has_valid_swift_g | has_direct_iban_g]
 
     df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', cfg['company'], payment_date, '130000', '01100']]
 
     for _, rec in df_g.iterrows():
-        pid        = str(rec['partner_id']).strip()
-        swift      = str(rec['swift']).strip()
-        iban_acct  = str(rec['iban_or_acct']).strip()
+        pid       = str(rec['partner_id']).strip()
+        swift     = str(rec['swift']).strip()
+        iban_acct = str(rec['iban_or_acct']).strip()
 
-        # Se SwiftCode inizia con lettera → è uno swift → F vuota, G = IBAN
-        # Se SwiftCode inizia con numero → è un sort code → F = sort code, G = bank account
-        if swift[0].isalpha():
+        # SwiftCode vuoto o inizia con lettera → IBAN in G, F vuota
+        # SwiftCode inizia con numero → sort code in F, bank account in G
+        if is_empty(swift) or swift[0].isalpha():
             col_f = ''
             col_g = iban_acct.upper()
         else:
