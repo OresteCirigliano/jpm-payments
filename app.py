@@ -7,10 +7,11 @@ import os
 from payments.utils import read_and_rename, MONTH_ABBREV
 from payments import gb, ch
 from payments.euro import generate as euro_generate, EURO_COUNTRIES
+from payments.nordic import generate as nordic_generate
 
 # ── Configurazione pagina ──────────────────────────────────
 st.set_page_config(
-    page_title="Commission file generator",
+    page_title="JPMorgan Payment Generator",
     page_icon="💳",
     layout="centered"
 )
@@ -40,6 +41,9 @@ def save_log(entry):
 COUNTRY_OPTIONS = [
     ("🇬🇧 United Kingdom (GB)",  "GB"),
     ("🇨🇭 Switzerland (CH)",     "CH"),
+    ("🇩🇰 Denmark (DK)",         "DK"),
+    ("🇸🇪 Sweden (SE)",          "SE"),
+    ("🇳🇴 Norway (NO)",          "NO"),
     ("🇧🇪 Belgium (BE)",         "BE"),
     ("🇮🇪 Ireland (EIR)",        "EIR"),
     ("🇪🇸 Spain (ES)",           "ES"),
@@ -53,10 +57,11 @@ COUNTRY_OPTIONS = [
     ("🇵🇹 Portugal (PT)",        "PT"),
 ]
 
-EURO_CODES = set(EURO_COUNTRIES.keys())
+EURO_CODES   = set(EURO_COUNTRIES.keys())
+NORDIC_CODES = {'DK', 'SE', 'NO'}
 
 # ── UI ─────────────────────────────────────────────────────
-st.title("💳 Commission file generator")
+st.title("💳 JPMorgan Payment Generator")
 st.markdown("---")
 
 st.subheader("1. Carica il file EMEA")
@@ -65,7 +70,7 @@ if uploaded_file:
     st.success(f"✅ File caricato: **{uploaded_file.name}**")
 
 st.markdown("---")
-st.subheader("2. Parametri")
+st.subheader("2. Parametri di pagamento")
 
 col1, col2 = st.columns(2)
 
@@ -88,9 +93,11 @@ payment_date = st.text_input(
     value=datetime.now().strftime("%Y%m%d")
 )
 
-# Info Sodexo per BE e NL
 if country_code in ('BE', 'NL'):
     st.info("ℹ️ Per questo paese il PayableTy 5 (Sodexo) viene escluso automaticamente.")
+
+if country_code == 'SE':
+    st.info("ℹ️ Per la Svezia il payment reference contiene solo il CustomerID (senza mese).")
 
 st.markdown("---")
 
@@ -106,20 +113,21 @@ if st.button("▶ Genera file di pagamento", type="primary"):
                 df = read_and_rename(file_bytes)
 
                 if country_code == 'GB':
-                    month_abbrev = MONTH_ABBREV[month]
-                    buf, num_tr, total, currency = gb.generate(df, payment_date, month_abbrev)
+                    buf, num_tr, total, currency = gb.generate(df, payment_date, MONTH_ABBREV[month])
                     filename = f"GB_payments_{payment_date}.xlsx"
 
                 elif country_code == 'CH':
                     buf, num_tr, total, currency = ch.generate(df, payment_date, month)
                     filename = f"CH_payments_{payment_date}.xlsx"
 
+                elif country_code in NORDIC_CODES:
+                    buf, num_tr, total, currency = nordic_generate(df, payment_date, month, country_code)
+                    filename = f"{country_code}_payments_{payment_date}.xlsx"
+
                 else:
-                    # Paesi EURO
                     buf, num_tr, total, currency = euro_generate(df, payment_date, month, country_code)
                     filename = f"{country_code}_payments_{payment_date}.xlsx"
 
-                # Risultato
                 st.success("✅ File generato con successo!")
                 c1, c2, c3 = st.columns(3)
                 c1.metric("Paese", country_code)
@@ -150,10 +158,10 @@ if st.button("▶ Genera file di pagamento", type="primary"):
 
 # ── Storico ────────────────────────────────────────────────
 st.markdown("---")
-st.subheader("📋 Storico File")
+st.subheader("📋 Storico pagamenti")
 log = load_log()
 if not log:
-    st.info("Nessun File generato ancora.")
+    st.info("Nessun pagamento generato ancora.")
 else:
     df_log = pd.DataFrame(log)
     df_log.columns = ["Data/Ora", "Paese", "Mese", "Data Pag.", "Transazioni", "Totale", "File Input", "File Output"]
