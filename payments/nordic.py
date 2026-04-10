@@ -63,23 +63,23 @@ def generate(df, payment_date, month_full, country_code):
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name',
                     'iban', 'routing_number', 'account_number']
 
-df_g = df_g[df_g['total_amount'] > 0]
+    # Escludi totali negativi o zero
+    df_g = df_g[df_g['total_amount'] > 0]
 
-# Rimuovi righe con IBAN e account non validi dopo il groupby
-df_g['iban'] = df_g['iban'].astype(str).str.strip()
-df_g['account_number'] = df_g['account_number'].astype(str).str.strip()
-df_g['routing_number'] = df_g['routing_number'].astype(str).str.strip()
+    # Pulisci e rimuovi righe senza bank details validi dopo il groupby
+    df_g['iban'] = df_g['iban'].astype(str).str.strip()
+    df_g['account_number'] = df_g['account_number'].astype(str).str.strip()
+    df_g['routing_number'] = df_g['routing_number'].astype(str).str.strip()
 
-df_g = df_g[
-    df_g['iban'].str.upper().str.startswith(cfg['iban_prefix']) |
-    (
+    has_iban_g = df_g['iban'].str.upper().str.startswith(cfg['iban_prefix'])
+    has_account_g = (
         (df_g['account_number'].str.upper() != 'NULL') &
         (df_g['account_number'].str.upper() != 'NAN') &
         (df_g['account_number'].str.strip('0') != '')
     )
-]
+    df_g = df_g[has_iban_g | has_account_g]
 
-df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
+    df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', cfg['company'], payment_date, '130000', '01100']]
 
@@ -87,7 +87,6 @@ df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
         pid  = str(rec['partner_id']).strip()
         iban = str(rec['iban']).strip()
 
-        # IBAN o account
         if iban.upper().startswith(cfg['iban_prefix']):
             col_f = ''
             col_g = iban.upper()
@@ -95,7 +94,6 @@ df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
             col_f = str(rec['routing_number']).strip()
             col_g = str(rec['account_number']).strip()
 
-        # Payment reference
         if cfg['pmt_ref'] == 'id_only':
             pmt_ref = pid
         else:
@@ -103,29 +101,28 @@ df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
         tr = [
             'TR', pid, payment_date, cfg['country'],
-            '',       # E
-            col_f,    # F sort code o vuota
-            col_g,    # G IBAN o account
-            '0',      # H
-            rec['amount_cents'],  # I
-            cfg['currency'],      # J
-            'GIR',    # K
-            '01',     # L
-            cfg['col_m'],         # M
-            cfg['jpm_ref'],       # N
-            '',       # O
-            '',       # P
-            str(rec['deposit_name']).strip(),  # Q
+            '',
+            col_f,
+            col_g,
+            '0',
+            rec['amount_cents'],
+            cfg['currency'],
+            'GIR',
+            '01',
+            cfg['col_m'],
+            cfg['jpm_ref'],
+            '',
+            '',
+            str(rec['deposit_name']).strip(),
         ]
-        tr += [''] * 10   # R-AA
-        tr += [pmt_ref]   # AB
+        tr += [''] * 10
+        tr += [pmt_ref]
         rows.append(tr)
 
     num_tr      = len(df_g)
     total_cents = int(df_g['amount_cents'].sum())
     rows.append(['FT', num_tr, num_tr + 2, total_cents])
 
-    # Salva Excel — colonne F e G come testo
     wb = Workbook()
     ws = wb.active
     for row_idx, row in enumerate(rows, 1):
