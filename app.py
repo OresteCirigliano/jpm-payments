@@ -158,7 +158,7 @@ if st.button("▶ Genera file di pagamento", type="primary"):
 
 # ── Storico ────────────────────────────────────────────────
 st.markdown("---")
-st.subheader("📋 Storico pagamenti")
+st.subheader("📋 Storico file generati")
 log = load_log()
 if not log:
     st.info("Nessun pagamento generato ancora.")
