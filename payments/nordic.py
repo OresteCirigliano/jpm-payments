@@ -1,34 +1,34 @@
-from payments.utils import apply_common_filters, save_excel
+from payments.utils import apply_common_filters
 from openpyxl import Workbook
 import io
 
 NORDIC_CONFIG = {
     'DK': {
-        'company':    'TJPCAPSDKK',
-        'country':    'DK',
-        'currency':   'DKK',
-        'jpm_ref':    '550002687',
+        'company':     'TJPCAPSDKK',
+        'country':     'DK',
+        'currency':    'DKK',
+        'jpm_ref':     '550002687',
         'iban_prefix': 'DK',
-        'col_m':      '',
-        'pmt_ref':    'full_month',   # {ID}FebruaryComm
+        'col_m':       '',
+        'pmt_ref':     'full_month',
     },
     'SE': {
-        'company':    'TJPCAPSSEK',
-        'country':    'SE',
-        'currency':   'SEK',
-        'jpm_ref':    '550002570',
+        'company':     'TJPCAPSSEK',
+        'country':     'SE',
+        'currency':    'SEK',
+        'jpm_ref':     '550002570',
         'iban_prefix': 'SE',
-        'col_m':      'NPG',
-        'pmt_ref':    'id_only',      # solo {ID}
+        'col_m':       'NPG',
+        'pmt_ref':     'id_only',
     },
     'NO': {
-        'company':    'TJPCAPSNOK',
-        'country':    'NO',
-        'currency':   'NOK',
-        'jpm_ref':    '550002679',
+        'company':     'TJPCAPSNOK',
+        'country':     'NO',
+        'currency':    'NOK',
+        'jpm_ref':     '550002679',
         'iban_prefix': 'NO',
-        'col_m':      '',
-        'pmt_ref':    'full_month',   # {ID}FebruaryComm
+        'col_m':       '',
+        'pmt_ref':     'full_month',
     },
 }
 
@@ -38,21 +38,19 @@ def generate(df, payment_date, month_full, country_code):
 
     df_c = apply_common_filters(df, country_code)
 
-    # Pulisci IBAN e routing/account
+    # Pulisci colonne
     df_c['IBAN'] = df_c['IBAN'].astype(str).str.strip()
     df_c['DepositRoutingNumber'] = df_c['DepositRoutingNumber'].astype(str).str.strip()
     df_c['DepositAccountNumber'] = df_c['DepositAccountNumber'].astype(str).str.strip()
 
     # Escludi righe senza bank details validi
-has_iban = df_c['IBAN'].str.upper().str.startswith(cfg['iban_prefix'])
-
-has_account = (
-    (df_c['DepositAccountNumber'].str.upper() != 'NULL') &
-    (df_c['DepositAccountNumber'].str.upper() != 'NAN') &
-    (df_c['DepositAccountNumber'].str.strip('0') != '')
-)
-
-df_c = df_c[has_iban | has_account]
+    has_iban = df_c['IBAN'].str.upper().str.startswith(cfg['iban_prefix'])
+    has_account = (
+        (df_c['DepositAccountNumber'].str.upper() != 'NULL') &
+        (df_c['DepositAccountNumber'].str.upper() != 'NAN') &
+        (df_c['DepositAccountNumber'].str.strip('0') != '')
+    )
+    df_c = df_c[has_iban | has_account]
 
     # Raggruppa per CustomerID
     df_g = df_c.groupby('effective_id').agg(
@@ -62,8 +60,8 @@ df_c = df_c[has_iban | has_account]
         routing_number = ('DepositRoutingNumber', 'first'),
         account_number = ('DepositAccountNumber', 'first'),
     ).reset_index()
-    df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'iban',
-                    'routing_number', 'account_number']
+    df_g.columns = ['partner_id', 'total_amount', 'deposit_name',
+                    'iban', 'routing_number', 'account_number']
 
     df_g = df_g[df_g['total_amount'] > 0]
     df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
@@ -74,9 +72,9 @@ df_c = df_c[has_iban | has_account]
         pid  = str(rec['partner_id']).strip()
         iban = str(rec['iban']).strip()
 
-        # Logica IBAN vs account
+        # IBAN o account
         if iban.upper().startswith(cfg['iban_prefix']):
-            col_f = ''          # vuota
+            col_f = ''
             col_g = iban.upper()
         else:
             col_f = str(rec['routing_number']).strip()
@@ -89,34 +87,30 @@ df_c = df_c[has_iban | has_account]
             pmt_ref = f"{pid}{month_full}Comm"
 
         tr = [
-            'TR',
-            pid,
-            payment_date,
-            cfg['country'],
-            '',              # E vuota
-            col_f,           # F sort code o vuota
-            col_g,           # G IBAN o account
-            '0',             # H
-            rec['amount_cents'],  # I importo centesimi
-            cfg['currency'], # J
-            'GIR',           # K
-            '01',            # L
-            cfg['col_m'],    # M vuota o NPG
-            cfg['jpm_ref'],  # N
-            '',              # O
-            '',              # P
-            str(rec['deposit_name']).strip(),  # Q nome
+            'TR', pid, payment_date, cfg['country'],
+            '',       # E
+            col_f,    # F sort code o vuota
+            col_g,    # G IBAN o account
+            '0',      # H
+            rec['amount_cents'],  # I
+            cfg['currency'],      # J
+            'GIR',    # K
+            '01',     # L
+            cfg['col_m'],         # M
+            cfg['jpm_ref'],       # N
+            '',       # O
+            '',       # P
+            str(rec['deposit_name']).strip(),  # Q
         ]
-        tr += [''] * 10      # R-AA vuote
-        tr += [pmt_ref]      # AB
-
+        tr += [''] * 10   # R-AA
+        tr += [pmt_ref]   # AB
         rows.append(tr)
 
     num_tr      = len(df_g)
     total_cents = int(df_g['amount_cents'].sum())
     rows.append(['FT', num_tr, num_tr + 2, total_cents])
 
-    # Salva Excel — colonna G (7) come testo
+    # Salva Excel — colonne F e G come testo
     wb = Workbook()
     ws = wb.active
     for row_idx, row in enumerate(rows, 1):
