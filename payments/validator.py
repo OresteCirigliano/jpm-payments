@@ -67,41 +67,41 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
             if abs(diff) > 0.01:
                 anomalies.append({
                     'CustomerID':       cid,
-                    'Tipo':             'Discrepanza importo',
-                    'Importo EMEA':     total_emea,
-                    'Importo Generato': total_gen,
-                    'Differenza':       diff,
-                    'Dettaglio':        f'Atteso {total_emea}, generato {total_gen}',
+                    'Type':             'Discrepanza importo',
+                    'EMEA Amount':     total_emea,
+                    'Generated Amount': total_gen,
+                    'Difference':       diff,
+                    'Detail':        f'Expected {total_emea}, generated {total_gen}',
                 })
         else:
             if has_payable_0_10:
-                exclusions_normal.append({'CustomerID': cid, 'Motivo': 'Payable escluso (0 o 10 = hold)', 'Importo EMEA': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Payable excluded (0 or 10 = hold)', 'EMEA Amount': total_emea})
             elif has_sodexo:
-                exclusions_normal.append({'CustomerID': cid, 'Motivo': 'Pagamento Sodexo (non JPM)', 'Importo EMEA': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Sodexo payment (not JPM)', 'EMEA Amount': total_emea})
             elif has_field11_block:
-                exclusions_normal.append({'CustomerID': cid, 'Motivo': f'Field11 bloccato (valore: {field11_vals})', 'Importo EMEA': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Field11 blocked (valore: {field11_vals})', 'EMEA Amount': total_emea})
             elif not has_bank or iban_missing:
-                exclusions_normal.append({'CustomerID': cid, 'Motivo': 'Bank details mancanti o IBAN vuoto', 'Importo EMEA': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Missing bank details or empty IBAN', 'EMEA Amount': total_emea})
             elif total_emea <= 0:
-                exclusions_normal.append({'CustomerID': cid, 'Motivo': f'Importo negativo o zero ({total_emea})', 'Importo EMEA': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Negative or zero amount ({total_emea})', 'EMEA Amount': total_emea})
             else:
                 anomalies.append({
                     'CustomerID':       cid,
-                    'Tipo':             'Escluso senza motivo chiaro',
-                    'Importo EMEA':     total_emea,
-                    'Importo Generato': 0,
-                    'Differenza':       -total_emea,
-                    'Dettaglio':        'Presente in EMEA ma non nel file generato senza motivo noto',
+                    'Type':             'Escluso senza motivo chiaro',
+                    'EMEA Amount':     total_emea,
+                    'Generated Amount': 0,
+                    'Difference':       -total_emea,
+                    'Detail':        'Present in EMEA but not in generated file without known reason',
                 })
 
     for cid in set(generated_ids) - all_emea_ids:
         anomalies.append({
             'CustomerID':       cid,
-            'Tipo':             'ID non presente in EMEA',
-            'Importo EMEA':     0,
-            'Importo Generato': generated_totals.get(cid, 0),
-            'Differenza':       generated_totals.get(cid, 0),
-            'Dettaglio':        'CustomerID nel file generato ma assente nel file EMEA',
+            'Type':             'ID non presente in EMEA',
+            'EMEA Amount':     0,
+            'Generated Amount': generated_totals.get(cid, 0),
+            'Difference':       generated_totals.get(cid, 0),
+            'Detail':        'CustomerID in generated file but not found in EMEA',
         })
 
     status = 'green' if len(anomalies) == 0 else 'red'
@@ -124,8 +124,8 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
     for cid in sorted(generated_ids):
         payments_list.append({
             'CustomerID': cid,
-            'Nome':       str(names.get(cid, '')),
-            'Importo':    generated_totals.get(cid, 0),
+            'Name':       str(names.get(cid, '')),
+            'Amount':    generated_totals.get(cid, 0),
         })
 
     buf = _build_report(summary, exclusions_normal, anomalies, payments_list, country_code)
@@ -154,7 +154,7 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
 
     # ── Foglio 1: Riepilogo ────────────────────────────────
     ws1 = wb.active
-    ws1.title = '1. Riepilogo'
+    ws1.title = '1. Summary'
 
     status_text = '🟢 OK — Nessuna anomalia' if summary['status'] == 'green' else '🔴 ATTENZIONE — Anomalie rilevate'
     status_fill = PatternFill('solid', fgColor=GREEN if summary['status'] == 'green' else RED)
@@ -169,16 +169,16 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
 
     data = [
         ('', '', ''),
-        ('Paese', country_code, ''),
+        ('Country', country_code, ''),
         ('', '', ''),
-        ('Totale EMEA (tutti)',   summary['total_emea'],     ''),
-        ('Totale file generato',  summary['total_generated'], ''),
-        ('Differenza',            summary['diff_total'],      '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
+        ('EMEA Total (all)',   summary['total_emea'],     ''),
+        ('Generated file total',  summary['total_generated'], ''),
+        ('Difference',            summary['diff_total'],      '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
         ('', '', ''),
-        ('Incaricati in EMEA',    summary['n_emea'],         ''),
-        ('Incaricati nel file',   summary['n_generated'],    ''),
-        ('Esclusi (motivo noto)', summary['n_exclusions'],   ''),
-        ('Anomalie',              summary['n_anomalies'],    '⚠️' if summary['n_anomalies'] > 0 else '✅'),
+        ('Records in EMEA',    summary['n_emea'],         ''),
+        ('Records in file',   summary['n_generated'],    ''),
+        ('Excluded (known reason)', summary['n_exclusions'],   ''),
+        ('Anomalies',              summary['n_anomalies'],    '⚠️' if summary['n_anomalies'] > 0 else '✅'),
     ]
 
     for row_idx, (label, value, note) in enumerate(data, 2):
@@ -191,46 +191,46 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
     ws1.column_dimensions['C'].width = 10
 
     # ── Foglio 2: Pagamenti ────────────────────────────────
-    ws2 = wb.create_sheet('2. Pagamenti')
-    write_header(ws2, ['CustomerID', 'Nome', 'Importo'])
+    ws2 = wb.create_sheet('2. Payments')
+    write_header(ws2, ['CustomerID', 'Name', 'Amount'])
 
     for row_idx, p in enumerate(payments_list, 2):
         ws2.cell(row=row_idx, column=1, value=p['CustomerID'])
-        ws2.cell(row=row_idx, column=2, value=p['Nome'])
-        ws2.cell(row=row_idx, column=3, value=p['Importo'])
+        ws2.cell(row=row_idx, column=2, value=p['Name'])
+        ws2.cell(row=row_idx, column=3, value=p['Amount'])
 
     last_row = len(payments_list) + 2
-    ws2.cell(row=last_row, column=1, value='TOTALE').font = Font(bold=True)
-    ws2.cell(row=last_row, column=3, value=round(sum(p['Importo'] for p in payments_list), 2)).font = Font(bold=True)
+    ws2.cell(row=last_row, column=1, value='TOTAL').font = Font(bold=True)
+    ws2.cell(row=last_row, column=3, value=round(sum(p['Amount'] for p in payments_list), 2)).font = Font(bold=True)
 
     ws2.column_dimensions['A'].width = 15
     ws2.column_dimensions['B'].width = 35
     ws2.column_dimensions['C'].width = 15
 
     # ── Foglio 3: Esclusioni normali ───────────────────────
-    ws3 = wb.create_sheet('3. Esclusioni normali')
-    write_header(ws3, ['CustomerID', 'Motivo esclusione', 'Importo EMEA'])
+    ws3 = wb.create_sheet('3. Normal exclusions')
+    write_header(ws3, ['CustomerID', 'Exclusion reason', 'EMEA Amount'])
 
     for row_idx, exc in enumerate(exclusions_normal, 2):
         ws3.cell(row=row_idx, column=1, value=exc['CustomerID'])
-        ws3.cell(row=row_idx, column=2, value=exc['Motivo'])
-        ws3.cell(row=row_idx, column=3, value=exc['Importo EMEA'])
+        ws3.cell(row=row_idx, column=2, value=exc['Reason'])
+        ws3.cell(row=row_idx, column=3, value=exc['EMEA Amount'])
 
     ws3.column_dimensions['A'].width = 15
     ws3.column_dimensions['B'].width = 40
     ws3.column_dimensions['C'].width = 15
 
     # ── Foglio 4: Anomalie ─────────────────────────────────
-    ws4 = wb.create_sheet('4. Anomalie')
-    write_header(ws4, ['CustomerID', 'Tipo', 'Importo EMEA', 'Importo Generato', 'Differenza', 'Dettaglio'])
+    ws4 = wb.create_sheet('4. Anomalies')
+    write_header(ws4, ['CustomerID', 'Type', 'EMEA Amount', 'Generated Amount', 'Difference', 'Detail'])
 
     for row_idx, an in enumerate(anomalies, 2):
         ws4.cell(row=row_idx, column=1, value=an['CustomerID'])
-        ws4.cell(row=row_idx, column=2, value=an['Tipo'])
-        ws4.cell(row=row_idx, column=3, value=an['Importo EMEA'])
-        ws4.cell(row=row_idx, column=4, value=an['Importo Generato'])
-        ws4.cell(row=row_idx, column=5, value=an['Differenza'])
-        ws4.cell(row=row_idx, column=6, value=an['Dettaglio'])
+        ws4.cell(row=row_idx, column=2, value=an['Type'])
+        ws4.cell(row=row_idx, column=3, value=an['EMEA Amount'])
+        ws4.cell(row=row_idx, column=4, value=an['Generated Amount'])
+        ws4.cell(row=row_idx, column=5, value=an['Difference'])
+        ws4.cell(row=row_idx, column=6, value=an['Detail'])
 
     ws4.column_dimensions['A'].width = 15
     ws4.column_dimensions['B'].width = 30
