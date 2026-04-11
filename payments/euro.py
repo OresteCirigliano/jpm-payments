@@ -44,8 +44,8 @@ def generate(df, payment_date, month_full, country_code):
     rows = []
     for _, rec in df_g.iterrows():
         pid = str(rec['partner_id']).strip()
-        rows.append([pid, f"{pid} {month_upper} COMM", rec['total_amount'],
-                     '', '', '', str(rec['iban']).strip(), '', str(rec['deposit_name']).strip()])
+        rows.append([pid, f"{pid} {month_upper} COMM", '', rec['total_amount'],
+                     '', '', str(rec['iban']).strip(), '', str(rec['deposit_name']).strip()])
 
     num_tr    = len(df_g)
     total_eur = round(df_g['total_amount'].sum(), 2)
