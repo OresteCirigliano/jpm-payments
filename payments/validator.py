@@ -22,6 +22,7 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
     emea_totals = df.groupby('effective_id')['Amount'].sum().round(2)
     names       = df.groupby('effective_id')['DepositName'].first()
     ibans       = df.groupby('effective_id')['IBAN'].first()
+    bill_counts = df.groupby('effective_id').size()
 
     special    = COUNTRY_SPECIAL.get(country_code, {})
     sodexo_pay = special.get('sodexo_payable', None)
@@ -129,6 +130,7 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
             'CustomerID':   cid,
             'Name':         str(names.get(cid, '')),
             'Amount':       generated_totals.get(cid, 0),
+            'Bills':        int(bill_counts.get(cid, 1)),
             'IBAN':         iban_raw,
             'IBAN Status':  emoji,
             'IBAN Detail':  msg,
@@ -216,7 +218,7 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
 
     # ── Foglio 2: Payments ────────────────────────────────
     ws2 = wb.create_sheet('2. Payments')
-    write_header(ws2, ['CustomerID', 'Name', 'Amount', 'IBAN', 'IBAN Status', 'IBAN Detail'])
+    write_header(ws2, ['CustomerID', 'Name', 'Amount', '# Bills', 'IBAN', 'IBAN Status', 'IBAN Detail'])
 
     RED_FILL    = PatternFill('solid', fgColor='FFFFE0E0')
     YELLOW_FILL = PatternFill('solid', fgColor='FFFFFFF0')
@@ -225,29 +227,32 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
         ws2.cell(row=row_idx, column=1, value=p['CustomerID'])
         ws2.cell(row=row_idx, column=2, value=p['Name'])
         ws2.cell(row=row_idx, column=3, value=p['Amount'])
-        iban_cell        = ws2.cell(row=row_idx, column=4, value=p['IBAN'])
+        ws2.cell(row=row_idx, column=4, value=p['Bills'])
+        iban_cell        = ws2.cell(row=row_idx, column=5, value=p['IBAN'])
         iban_cell.number_format = '@'
-        status_cell      = ws2.cell(row=row_idx, column=5, value=p['IBAN Status'])
-        detail_cell      = ws2.cell(row=row_idx, column=6, value=p['IBAN Detail'])
+        status_cell      = ws2.cell(row=row_idx, column=6, value=p['IBAN Status'])
+        detail_cell      = ws2.cell(row=row_idx, column=7, value=p['IBAN Detail'])
 
         # Highlight row if IBAN issue
         if p['IBAN Status'] == '❌':
-            for col in range(1, 7):
+            for col in range(1, 8):
                 ws2.cell(row=row_idx, column=col).fill = RED_FILL
         elif p['IBAN Status'] == '⚠️':
-            for col in range(1, 7):
+            for col in range(1, 8):
                 ws2.cell(row=row_idx, column=col).fill = YELLOW_FILL
 
     last_row = len(payments_list) + 2
     ws2.cell(row=last_row, column=1, value='TOTAL').font = Font(bold=True)
     ws2.cell(row=last_row, column=3, value=round(sum(p['Amount'] for p in payments_list), 2)).font = Font(bold=True)
+    ws2.cell(row=last_row, column=4, value=sum(p['Bills'] for p in payments_list)).font = Font(bold=True)
 
     ws2.column_dimensions['A'].width = 15
     ws2.column_dimensions['B'].width = 35
     ws2.column_dimensions['C'].width = 15
-    ws2.column_dimensions['D'].width = 35
-    ws2.column_dimensions['E'].width = 12
-    ws2.column_dimensions['F'].width = 45
+    ws2.column_dimensions['D'].width = 10
+    ws2.column_dimensions['E'].width = 35
+    ws2.column_dimensions['F'].width = 12
+    ws2.column_dimensions['G'].width = 45
 
     # ── Foglio 3: Normal exclusions ───────────────────────
     ws3 = wb.create_sheet('3. Normal exclusions')
