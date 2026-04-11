@@ -139,6 +139,8 @@ if st.button("▶ Generate payment file + Validation report", type="primary"):
 
                 if status == 'green':
                     st.markdown('<div class="green-box">🟢 Validation OK — No anomalies found</div>', unsafe_allow_html=True)
+                elif status == 'yellow':
+                    st.markdown('<div style="background-color:#FFC000;padding:15px;border-radius:8px;color:black;font-size:18px;font-weight:bold;text-align:center;">🟡 WARNING — IBAN issues detected, please check the Payments sheet</div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div class="red-box">🔴 WARNING — Anomalies detected! Please check the report.</div>', unsafe_allow_html=True)
 
