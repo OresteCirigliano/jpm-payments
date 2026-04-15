@@ -33,7 +33,7 @@ def generate(df, payment_date, month_abbrev):
         routing_number = ('DepositRoutingNumber', 'first'),
     ).reset_index()
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'account_number', 'routing_number']
-    df_g = df_g[df_g['total_amount'] > 0]
+    df_g = df_g[df_g['total_amount'] > 0.01]
     df_g['amount_pence'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', CFG['company'], payment_date, '101112', '01100']]
