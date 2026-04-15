@@ -3,12 +3,12 @@ from openpyxl import Workbook
 import io
 
 COUNTRY_FILTER = {
-    'BE': 'BE', 'EIR': 'EIR', 'ES': 'ES', 'FI': 'FI', 'FR': 'FR',
+    'BE': 'BE', 'IE': 'IE', 'ES': 'ES', 'FI': 'FI', 'FR': 'FR',
     'GER': 'DE', 'IT': 'IT', 'LU': 'LU', 'NL': 'NL', 'OS': 'AT', 'PT': 'PT',
 }
 
 EURO_COUNTRIES = {
-    'BE': 'Belgium', 'EIR': 'Ireland', 'ES': 'Spain', 'FI': 'Finland',
+    'BE': 'Belgium', 'IE': 'Ireland', 'ES': 'Spain', 'FI': 'Finland',
     'FR': 'France', 'GER': 'Germany', 'IT': 'Italy', 'LU': 'Luxembourg',
     'NL': 'Netherlands', 'OS': 'Austria', 'PT': 'Portugal',
 }
