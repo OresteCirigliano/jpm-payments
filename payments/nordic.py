@@ -31,7 +31,7 @@ def generate(df, payment_date, month_full, country_code):
         iban_or_acct = ('IBAN',        'first'),
     ).reset_index()
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'swift', 'iban_or_acct']
-    df_g = df_g[df_g['total_amount'] > 0]
+    df_g = df_g[df_g['total_amount'] > 0.01]
     df_g['swift']        = df_g['swift'].astype(str).str.strip()
     df_g['iban_or_acct'] = df_g['iban_or_acct'].astype(str).str.strip()
     df_g = df_g[~df_g['iban_or_acct'].apply(is_empty)]
