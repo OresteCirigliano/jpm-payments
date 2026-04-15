@@ -34,7 +34,7 @@ def generate(df, payment_date, month_full, country_code='AE'):
         swift        = ('SwiftCode',   'first'),
     ).reset_index()
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'iban', 'swift']
-    df_g = df_g[df_g['total_amount'] > 0]
+    df_g = df_g[df_g['total_amount'] > 0.01]
     df_g['total_amount'] = df_g['total_amount'].round(2)
 
     rows = [['HEADER', CFG['header_ref'], 1]]
