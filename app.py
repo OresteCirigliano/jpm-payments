@@ -49,7 +49,7 @@ COUNTRY_OPTIONS = [
     ("🇸🇪 Sweden (SE)",          "SE"),
     ("🇳🇴 Norway (NO)",          "NO"),
     ("🇧🇪 Belgium (BE)",         "BE"),
-    ("🇮🇪 Ireland (EIR)",        "EIR"),
+    ("🇮🇪 Ireland (EIR)",        "IE"),
     ("🇪🇸 Spain (ES)",           "ES"),
     ("🇫🇮 Finland (FI)",         "FI"),
     ("🇫🇷 France (FR)",          "FR"),
