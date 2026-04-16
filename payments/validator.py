@@ -7,9 +7,9 @@ from payments.iban_validator import validate_iban
 PAYABLE_EXCLUDE = [0, 10]
 
 COUNTRY_SPECIAL = {
-    'BE': {'sodexo_payable': 5,    'sodexo_swift': None},
-    'NL': {'sodexo_payable': 5,    'sodexo_swift': None},
-    'PL': {'sodexo_payable': 8,    'sodexo_swift': 'SODEXO'},
+    'BE': {'sodexo_payable': 5,    'sodexo_swift': None,     'sodexo_label': 'Payquiker'},
+    'NL': {'sodexo_payable': 5,    'sodexo_swift': None,     'sodexo_label': 'Payquiker'},
+    'PL': {'sodexo_payable': 8,    'sodexo_swift': 'SODEXO', 'sodexo_label': 'Sodexo'},
 }
 
 def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_totals, sodexo_exclude=False):
@@ -24,9 +24,10 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
     ibans       = df.groupby('effective_id')['IBAN'].first()
     bill_counts = df.groupby('effective_id').size()
 
-    special    = COUNTRY_SPECIAL.get(country_code, {})
-    sodexo_pay = special.get('sodexo_payable', None)
-    sodexo_swft= special.get('sodexo_swift', None)
+    special      = COUNTRY_SPECIAL.get(country_code, {})
+    sodexo_pay   = special.get('sodexo_payable', None)
+    sodexo_swft  = special.get('sodexo_swift', None)
+    sodexo_label = special.get('sodexo_label', 'Sodexo')
 
     exclusions_normal = []
     anomalies         = []
@@ -53,7 +54,7 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
 
         iban = str(rows['IBAN'].iloc[0]).strip()
         acct = str(rows['DepositAccountNumber'].iloc[0]).strip()
-        has_bank  = (
+        has_bank = (
             iban.upper() not in ('NULL', 'NAN', '') or
             (acct.upper() not in ('NULL', 'NAN', '') and acct.strip('0') != '')
         )
@@ -72,16 +73,20 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
                     'Detail':           f'Expected {total_emea}, generated {total_gen}',
                 })
         else:
-            if has_payable_0_10:
-                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Payable excluded (0 or 10 = hold)', 'EMEA Amount': total_emea})
-            elif has_sodexo:
-                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Sodexo payment (not JPM)', 'EMEA Amount': total_emea})
+            name = str(names.get(cid, ''))
+            # Priority: negative → zero → hold → field11 → payquiker/sodexo → bank details
+            if total_emea < 0:
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': 'Negative amount',                        'EMEA Amount': total_emea, 'Paid': 'No - Negative'})
+            elif total_emea == 0:
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': 'Zero amount',                            'EMEA Amount': total_emea, 'Paid': 'No - Zero'})
+            elif has_payable_0_10:
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': 'Payable excluded (0 or 10 = hold)',      'EMEA Amount': total_emea, 'Paid': 'No - Hold'})
             elif has_field11_block:
-                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Field11 blocked (value: {field11_vals})', 'EMEA Amount': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': f'Field11 blocked (value: {field11_vals})','EMEA Amount': total_emea, 'Paid': 'No - Hold'})
+            elif has_sodexo:
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': f'{sodexo_label} payment (not JPM)',      'EMEA Amount': total_emea, 'Paid': f'Yes - {sodexo_label}'})
             elif not has_bank or iban_missing:
-                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Missing bank details or empty IBAN', 'EMEA Amount': total_emea})
-            elif total_emea <= 0:
-                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Negative or zero amount ({total_emea})', 'EMEA Amount': total_emea})
+                exclusions_normal.append({'CustomerID': cid, 'Name': name, 'Reason': 'Missing bank details or empty IBAN',     'EMEA Amount': total_emea, 'Paid': 'No - Bank details'})
             else:
                 anomalies.append({
                     'CustomerID':       cid,
@@ -118,7 +123,6 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
         'n_anomalies':     len(anomalies),
     }
 
-    # Payments list with IBAN validation
     payments_list = []
     iban_issues   = 0
     for cid in sorted(generated_ids):
@@ -127,13 +131,13 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
         if not is_valid:
             iban_issues += 1
         payments_list.append({
-            'CustomerID':   cid,
-            'Name':         str(names.get(cid, '')),
-            'Amount':       generated_totals.get(cid, 0),
-            'Bills':        int(bill_counts.get(cid, 1)),
-            'IBAN':         iban_raw,
-            'IBAN Status':  emoji,
-            'IBAN Detail':  msg,
+            'CustomerID':  cid,
+            'Name':        str(names.get(cid, '')),
+            'Amount':      generated_totals.get(cid, 0),
+            'Bills':       int(bill_counts.get(cid, 1)),
+            'IBAN':        iban_raw,
+            'IBAN Status': emoji,
+            'IBAN Detail': msg,
         })
 
     summary['iban_issues'] = iban_issues
@@ -161,18 +165,18 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
 
     def write_header(ws, cols):
         for col_idx, col_name in enumerate(cols, 1):
-            cell           = ws.cell(row=1, column=col_idx, value=col_name)
-            cell.font      = header_font
-            cell.fill      = header_fill
+            cell = ws.cell(row=1, column=col_idx, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
             cell.alignment = center_align
         ws.row_dimensions[1].height = 20
 
-    # ── Foglio 1: Summary ─────────────────────────────────
+    # Sheet 1: Summary
     ws1 = wb.active
     ws1.title = '1. Summary'
 
     if summary['status'] == 'green':
-        status_text = '🟢 OK — No anomalies found'
+        status_text  = '🟢 OK — No anomalies found'
         status_color = GREEN
         font_color   = WHITE
     elif summary['status'] == 'yellow':
@@ -185,7 +189,7 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
         font_color   = WHITE
 
     ws1.merge_cells('A1:C1')
-    cell           = ws1['A1']
+    cell = ws1['A1']
     cell.value     = status_text
     cell.font      = Font(bold=True, size=14, color=font_color)
     cell.fill      = PatternFill('solid', fgColor=status_color)
@@ -194,17 +198,17 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
 
     data = [
         ('', '', ''),
-        ('Country', country_code, ''),
+        ('Country',                country_code,                ''),
         ('', '', ''),
-        ('EMEA Total (all)',        summary['total_emea'],      ''),
-        ('Generated file total',    summary['total_generated'],  ''),
-        ('Difference',              summary['diff_total'],       '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
+        ('EMEA Total (all)',        summary['total_emea'],       ''),
+        ('Generated file total',   summary['total_generated'],   ''),
+        ('Difference',             summary['diff_total'],        '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
         ('', '', ''),
-        ('Records in EMEA',         summary['n_emea'],          ''),
-        ('Records in file',         summary['n_generated'],     ''),
-        ('Excluded (known reason)', summary['n_exclusions'],    ''),
-        ('Anomalies',               summary['n_anomalies'],     '⚠️' if summary['n_anomalies'] > 0 else '✅'),
-        ('IBAN issues',             summary.get('iban_issues', 0), '⚠️' if summary.get('iban_issues', 0) > 0 else '✅'),
+        ('Records in EMEA',        summary['n_emea'],            ''),
+        ('Records in file',        summary['n_generated'],       ''),
+        ('Excluded (known reason)', summary['n_exclusions'],     ''),
+        ('Anomalies',              summary['n_anomalies'],       '⚠️' if summary['n_anomalies'] > 0 else '✅'),
+        ('IBAN issues',            summary.get('iban_issues', 0),'⚠️' if summary.get('iban_issues', 0) > 0 else '✅'),
     ]
 
     for row_idx, (label, value, note) in enumerate(data, 2):
@@ -216,7 +220,7 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
     ws1.column_dimensions['B'].width = 20
     ws1.column_dimensions['C'].width = 10
 
-    # ── Foglio 2: Payments ────────────────────────────────
+    # Sheet 2: Payments
     ws2 = wb.create_sheet('2. Payments')
     write_header(ws2, ['CustomerID', 'Name', 'Amount', '# Bills', 'IBAN', 'IBAN Status', 'IBAN Detail'])
 
@@ -228,12 +232,10 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
         ws2.cell(row=row_idx, column=2, value=p['Name'])
         ws2.cell(row=row_idx, column=3, value=p['Amount'])
         ws2.cell(row=row_idx, column=4, value=p['Bills'])
-        iban_cell        = ws2.cell(row=row_idx, column=5, value=p['IBAN'])
+        iban_cell = ws2.cell(row=row_idx, column=5, value=p['IBAN'])
         iban_cell.number_format = '@'
-        status_cell      = ws2.cell(row=row_idx, column=6, value=p['IBAN Status'])
-        detail_cell      = ws2.cell(row=row_idx, column=7, value=p['IBAN Detail'])
-
-        # Highlight row if IBAN issue
+        ws2.cell(row=row_idx, column=6, value=p['IBAN Status'])
+        ws2.cell(row=row_idx, column=7, value=p['IBAN Detail'])
         if p['IBAN Status'] == '❌':
             for col in range(1, 8):
                 ws2.cell(row=row_idx, column=col).fill = RED_FILL
@@ -254,20 +256,28 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
     ws2.column_dimensions['F'].width = 12
     ws2.column_dimensions['G'].width = 45
 
-    # ── Foglio 3: Normal exclusions ───────────────────────
+    # Sheet 3: Normal exclusions
     ws3 = wb.create_sheet('3. Normal exclusions')
-    write_header(ws3, ['CustomerID', 'Exclusion reason', 'EMEA Amount'])
+    write_header(ws3, ['CustomerID', 'Name', 'Exclusion reason', 'EMEA Amount', 'Paid'])
+
+    YES_FILL = PatternFill('solid', fgColor='FFE2EFDA')
+    NO_FILL  = PatternFill('solid', fgColor='FFFFE0E0')
 
     for row_idx, exc in enumerate(exclusions_normal, 2):
         ws3.cell(row=row_idx, column=1, value=exc['CustomerID'])
-        ws3.cell(row=row_idx, column=2, value=exc['Reason'])
-        ws3.cell(row=row_idx, column=3, value=exc['EMEA Amount'])
+        ws3.cell(row=row_idx, column=2, value=exc['Name'])
+        ws3.cell(row=row_idx, column=3, value=exc['Reason'])
+        ws3.cell(row=row_idx, column=4, value=exc['EMEA Amount'])
+        paid_cell = ws3.cell(row=row_idx, column=5, value=exc['Paid'])
+        paid_cell.fill = YES_FILL if exc['Paid'].startswith('Yes') else NO_FILL
 
     ws3.column_dimensions['A'].width = 15
-    ws3.column_dimensions['B'].width = 40
-    ws3.column_dimensions['C'].width = 15
+    ws3.column_dimensions['B'].width = 35
+    ws3.column_dimensions['C'].width = 40
+    ws3.column_dimensions['D'].width = 15
+    ws3.column_dimensions['E'].width = 20
 
-    # ── Foglio 4: Anomalies ───────────────────────────────
+    # Sheet 4: Anomalies
     ws4 = wb.create_sheet('4. Anomalies')
     write_header(ws4, ['CustomerID', 'Type', 'EMEA Amount', 'Generated Amount', 'Difference', 'Detail'])
 
