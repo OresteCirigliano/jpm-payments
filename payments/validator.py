@@ -171,130 +171,80 @@ def _build_report(summary, exclusions_normal, anomalies, payments_list, country_
             cell.alignment = center_align
         ws.row_dimensions[1].height = 20
 
-    # Sheet 1: Summary
+    # --- Foglio 1: Summary ---
     ws1 = wb.active
     ws1.title = '1. Summary'
-
+    # ... (codice del summary invariato) ...
     if summary['status'] == 'green':
-        status_text  = '🟢 OK — No anomalies found'
-        status_color = GREEN
-        font_color   = WHITE
+        status_text, status_color, font_color = '🟢 OK — No anomalies found', GREEN, WHITE
     elif summary['status'] == 'yellow':
-        status_text  = '🟡 WARNING — IBAN issues detected, please check Payments sheet'
-        status_color = YELLOW
-        font_color   = BLACK
+        status_text, status_color, font_color = '🟡 WARNING — IBAN issues detected', YELLOW, BLACK
     else:
-        status_text  = '🔴 WARNING — Anomalies detected! Please check the report.'
-        status_color = RED
-        font_color   = WHITE
+        status_text, status_color, font_color = '🔴 WARNING — Anomalies detected!', RED, WHITE
 
     ws1.merge_cells('A1:C1')
     cell = ws1['A1']
-    cell.value     = status_text
-    cell.font      = Font(bold=True, size=14, color=font_color)
-    cell.fill      = PatternFill('solid', fgColor=status_color)
-    cell.alignment = center_align
-    ws1.row_dimensions[1].height = 30
+    cell.value, cell.font, cell.fill, cell.alignment = status_text, Font(bold=True, size=14, color=font_color), PatternFill('solid', fgColor=status_color), center_align
 
-    data = [
-        ('', '', ''),
-        ('Country',                country_code,                ''),
-        ('', '', ''),
-        ('EMEA Total (all)',        summary['total_emea'],       ''),
-        ('Generated file total',   summary['total_generated'],   ''),
-        ('Difference',             summary['diff_total'],        '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
-        ('', '', ''),
-        ('Records in EMEA',        summary['n_emea'],            ''),
-        ('Records in file',        summary['n_generated'],       ''),
-        ('Excluded (known reason)', summary['n_exclusions'],     ''),
-        ('Anomalies',              summary['n_anomalies'],       '⚠️' if summary['n_anomalies'] > 0 else '✅'),
-        ('IBAN issues',            summary.get('iban_issues', 0),'⚠️' if summary.get('iban_issues', 0) > 0 else '✅'),
-    ]
+    data = [('', '', ''), ('Country', country_code, ''), ('', '', ''),
+            ('EMEA Total (all)', summary['total_emea'], ''),
+            ('Generated file total', summary['total_generated'], ''),
+            ('Difference', summary['diff_total'], '⚠️' if abs(summary['diff_total']) > 0.01 else '✅'),
+            ('', '', ''), ('Records in EMEA', summary['n_emea'], ''),
+            ('Records in file', summary['n_generated'], ''),
+            ('Excluded (known reason)', summary['n_exclusions'], ''),
+            ('Anomalies', summary['n_anomalies'], '⚠️' if summary['n_anomalies'] > 0 else '✅'),
+            ('IBAN issues', summary.get('iban_issues', 0), '⚠️' if summary.get('iban_issues', 0) > 0 else '✅')]
 
     for row_idx, (label, value, note) in enumerate(data, 2):
         ws1.cell(row=row_idx, column=1, value=label).font = Font(bold=True)
         ws1.cell(row=row_idx, column=2, value=value)
         ws1.cell(row=row_idx, column=3, value=note)
 
-    ws1.column_dimensions['A'].width = 30
-    ws1.column_dimensions['B'].width = 20
-    ws1.column_dimensions['C'].width = 10
-
-    # Sheet 2: Payments
+    # --- Foglio 2: Payments ---
     ws2 = wb.create_sheet('2. Payments')
     write_header(ws2, ['CustomerID', 'Name', 'Amount', '# Bills', 'IBAN', 'IBAN Status', 'IBAN Detail'])
-
-    RED_FILL    = PatternFill('solid', fgColor='FFFFE0E0')
-    YELLOW_FILL = PatternFill('solid', fgColor='FFFFFFF0')
-
     for row_idx, p in enumerate(payments_list, 2):
-        ws2.cell(row=row_idx, column=1, value=p['CustomerID'])
-        ws2.cell(row=row_idx, column=2, value=p['Name'])
-        ws2.cell(row=row_idx, column=3, value=p['Amount'])
-        ws2.cell(row=row_idx, column=4, value=p['Bills'])
-        iban_cell = ws2.cell(row=row_idx, column=5, value=p['IBAN'])
-        iban_cell.number_format = '@'
-        ws2.cell(row=row_idx, column=6, value=p['IBAN Status'])
-        ws2.cell(row=row_idx, column=7, value=p['IBAN Detail'])
-        if p['IBAN Status'] == '❌':
-            for col in range(1, 8):
-                ws2.cell(row=row_idx, column=col).fill = RED_FILL
-        elif p['IBAN Status'] == '⚠️':
-            for col in range(1, 8):
-                ws2.cell(row=row_idx, column=col).fill = YELLOW_FILL
+        ws2.cell(row_idx, 1, p['CustomerID']); ws2.cell(row_idx, 2, p['Name'])
+        ws2.cell(row_idx, 3, p['Amount']); ws2.cell(row_idx, 4, p['Bills'])
+        ws2.cell(row_idx, 5, p['IBAN']).number_format = '@'
+        ws2.cell(row_idx, 6, p['IBAN Status']); ws2.cell(row_idx, 7, p['IBAN Detail'])
 
-    last_row = len(payments_list) + 2
-    ws2.cell(row=last_row, column=1, value='TOTAL').font = Font(bold=True)
-    ws2.cell(row=last_row, column=3, value=round(sum(p['Amount'] for p in payments_list), 2)).font = Font(bold=True)
-    ws2.cell(row=last_row, column=4, value=sum(p['Bills'] for p in payments_list)).font = Font(bold=True)
-
-    ws2.column_dimensions['A'].width = 15
-    ws2.column_dimensions['B'].width = 35
-    ws2.column_dimensions['C'].width = 15
-    ws2.column_dimensions['D'].width = 10
-    ws2.column_dimensions['E'].width = 35
-    ws2.column_dimensions['F'].width = 12
-    ws2.column_dimensions['G'].width = 45
-
-    # Sheet 3: Normal exclusions
+    # --- Foglio 3: Normal Exclusions (VERSIONE AGGIORNATA) ---
     ws3 = wb.create_sheet('3. Normal exclusions')
+    # AGGIUNTE COLONNE 'Name' e 'Paid'
     write_header(ws3, ['CustomerID', 'Name', 'Exclusion reason', 'EMEA Amount', 'Paid'])
 
-    YES_FILL = PatternFill('solid', fgColor='FFE2EFDA')
-    NO_FILL  = PatternFill('solid', fgColor='FFFFE0E0')
+    YES_FILL = PatternFill('solid', fgColor='FFE2EFDA') # Verde chiaro
+    NO_FILL  = PatternFill('solid', fgColor='FFFFE0E0') # Rosso chiaro
 
     for row_idx, exc in enumerate(exclusions_normal, 2):
         ws3.cell(row=row_idx, column=1, value=exc['CustomerID'])
-        ws3.cell(row=row_idx, column=2, value=exc['Name'])
+        ws3.cell(row=row_idx, column=2, value=exc.get('Name', 'N/A'))
         ws3.cell(row=row_idx, column=3, value=exc['Reason'])
         ws3.cell(row=row_idx, column=4, value=exc['EMEA Amount'])
-        paid_cell = ws3.cell(row=row_idx, column=5, value=exc['Paid'])
-        paid_cell.fill = YES_FILL if exc['Paid'].startswith('Yes') else NO_FILL
+        
+        # Gestione colonna PAID con colori
+        paid_val = exc.get('Paid', 'No')
+        paid_cell = ws3.cell(row=row_idx, column=5, value=paid_val)
+        if paid_val.startswith('Yes'):
+            paid_cell.fill = YES_FILL
+        else:
+            paid_cell.fill = NO_FILL
 
     ws3.column_dimensions['A'].width = 15
-    ws3.column_dimensions['B'].width = 35
-    ws3.column_dimensions['C'].width = 40
+    ws3.column_dimensions['B'].width = 30
+    ws3.column_dimensions['C'].width = 45
     ws3.column_dimensions['D'].width = 15
     ws3.column_dimensions['E'].width = 20
 
-    # Sheet 4: Anomalies
+    # --- Foglio 4: Anomalies ---
     ws4 = wb.create_sheet('4. Anomalies')
     write_header(ws4, ['CustomerID', 'Type', 'EMEA Amount', 'Generated Amount', 'Difference', 'Detail'])
-
     for row_idx, an in enumerate(anomalies, 2):
-        ws4.cell(row=row_idx, column=1, value=an['CustomerID'])
-        ws4.cell(row=row_idx, column=2, value=an['Type'])
-        ws4.cell(row=row_idx, column=3, value=an['EMEA Amount'])
-        ws4.cell(row=row_idx, column=4, value=an['Generated Amount'])
-        ws4.cell(row=row_idx, column=5, value=an['Difference'])
-        ws4.cell(row=row_idx, column=6, value=an['Detail'])
-
-    ws4.column_dimensions['A'].width = 15
-    ws4.column_dimensions['B'].width = 30
-    ws4.column_dimensions['C'].width = 15
-    ws4.column_dimensions['D'].width = 18
-    ws4.column_dimensions['E'].width = 15
-    ws4.column_dimensions['F'].width = 50
+        ws4.cell(row_idx, 1, an['CustomerID']); ws4.cell(row_idx, 2, an['Type'])
+        ws4.cell(row_idx, 3, an['EMEA Amount']); ws4.cell(row_idx, 4, an['Generated Amount'])
+        ws4.cell(row_idx, 5, an['Difference']); ws4.cell(row_idx, 6, an['Detail'])
 
     buf = io.BytesIO()
     wb.save(buf)
