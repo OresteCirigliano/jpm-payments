@@ -24,9 +24,10 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
     ibans       = df.groupby('effective_id')['IBAN'].first()
     bill_counts = df.groupby('effective_id').size()
 
-    special    = COUNTRY_SPECIAL.get(country_code, {})
-    sodexo_pay = special.get('sodexo_payable', None)
-    sodexo_swft= special.get('sodexo_swift', None)
+    special = COUNTRY_SPECIAL.get(country_code, {})
+    label = special.get('third_party_label', 'Third Party')
+    tp_pay = special.get('payable_type', None)
+    tp_swft = special.get('swift', None)
 
     exclusions_normal = []
     anomalies         = []
