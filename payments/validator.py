@@ -49,15 +49,12 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
         has_payable_0_10  = any(v in PAYABLE_EXCLUDE for v in payable_vals)
         has_field11_block = any(v not in [3] for v in field11_vals if pd.notna(v))
 
-        # Check per Sodexo / PayQuicker (Logica Corretta)
+        # Check per Sodexo / PayQuicker
         has_third_party = False
-        # Caso Belgio/Olanda o flag esplicito
         if (sodexo_exclude or country_code in ['BE', 'NL']) and 5 in payable_vals:
             has_third_party = True
-        # Caso Polonia o altri mappati in COUNTRY_SPECIAL
         elif tp_pay is not None and tp_pay in payable_vals:
             has_third_party = True
-        # Caso SWIFT specifico
         elif tp_swft is not None:
             swift_vals = rows['SwiftCode'].astype(str).str.strip().str.upper()
             if swift_vals.eq(tp_swft.upper()).any():
@@ -81,4 +78,22 @@ def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_t
                     'CustomerID':       cid,
                     'Type':             'Amount discrepancy',
                     'EMEA Amount':      total_emea,
-                    '
+                    'Generated Amount': total_gen,
+                    'Difference':       diff,
+                    'Detail':           f'Expected {total_emea}, generated {total_gen}',
+                })
+        else:
+            # --- GERARCHIA DI ESCLUSIONE ---
+            if total_emea < 0.01:
+                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Negative or zero amount ({total_emea})', 'EMEA Amount': total_emea})
+            elif has_payable_0_10:
+                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Payable excluded (0 or 10 = hold)', 'EMEA Amount': total_emea})
+            elif has_third_party:
+                exclusions_normal.append({'CustomerID': cid, 'Reason': f'{tp_label} payment (not JPM)', 'EMEA Amount': total_emea})
+            elif has_field11_block:
+                exclusions_normal.append({'CustomerID': cid, 'Reason': f'Field11 blocked (value: {field11_vals})', 'EMEA Amount': total_emea})
+            elif not has_bank or iban_missing:
+                exclusions_normal.append({'CustomerID': cid, 'Reason': 'Missing bank details or empty IBAN', 'EMEA Amount': total_emea})
+            else:
+                anomalies.append({
+                    'CustomerID':       cid,
