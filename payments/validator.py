@@ -7,9 +7,9 @@ from payments.iban_validator import validate_iban
 PAYABLE_EXCLUDE = [0, 10]
 
 COUNTRY_SPECIAL = {
-    'BE': {'sodexo_payable': 5,    'sodexo_swift': None},
-    'NL': {'sodexo_payable': 5,    'sodexo_swift': None},
-    'PL': {'sodexo_payable': 8,    'sodexo_swift': 'SODEXO'},
+    'BE': {'third_party_label': 'PayQuicker', 'payable_type': 5, 'swift': None},
+    'NL': {'third_party_label': 'PayQuicker', 'payable_type': 5, 'swift': None},
+    'PL': {'third_party_label': 'Sodexo',     'payable_type': 8, 'swift': 'SODEXO'},
 }
 
 def validate(df_emea, country_code, emea_filter_code, generated_ids, generated_totals, sodexo_exclude=False):
