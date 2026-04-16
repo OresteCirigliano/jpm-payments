@@ -70,7 +70,7 @@ EMEA_FILTER = {
 
 EURO_CODES      = set(EURO_COUNTRIES.keys())
 NORDIC_CODES    = {'DK', 'SE', 'NO'}
-SODEXO_COUNTRIES = {'BE', 'NL'}
+Payquiker_COUNTRIES = {'BE', 'NL'}
 
 st.title("🏦 Commission File Generator")
 st.markdown("---")
@@ -92,8 +92,8 @@ with col2:
 
 payment_date = st.text_input("Payment date (YYYYMMDD)", value=datetime.now().strftime("%Y%m%d"))
 
-if country_code in SODEXO_COUNTRIES:
-    st.info("ℹ️ For this country, PayableTy 5 (Sodexo) is automatically excluded.")
+if country_code in Payquiker_COUNTRIES:
+    st.info("ℹ️ For this country, PayableTy 5 (Payquiker) is automatically excluded.")
 if country_code == 'SE':
     st.info("ℹ️ For Sweden, the payment reference contains only the CustomerID (no month).")
 if country_code == 'AE':
@@ -132,9 +132,9 @@ if st.button("▶ Generate payment file + Validation report", type="primary"):
                     filename = f"{country_code}_payments_{payment_date}.xlsx"
 
                 emea_code   = EMEA_FILTER.get(country_code, country_code)
-                sodexo_excl = country_code in SODEXO_COUNTRIES
+                Payquiker_excl = country_code in Payquiker_COUNTRIES
                 status, summary, buf_report = validate(
-                    df, country_code, emea_code, gen_ids, gen_totals, sodexo_excl
+                    df, country_code, emea_code, gen_ids, gen_totals, Payquiker_excl
                 )
 
                 if status == 'green':
