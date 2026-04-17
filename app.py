@@ -28,8 +28,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# app.py, righe 31-43
-LOG_FILE = "payment_log.json"  # ← Scritto in directory accessibile!
+LOG_FILE = "payment_log.json"
+
+def load_log():
+    if os.path.exists(LOG_FILE):
+        with open(LOG_FILE, 'r') as f:
+            return json.load(f)
+    return []
 
 def save_log(entry):
     log = load_log()
