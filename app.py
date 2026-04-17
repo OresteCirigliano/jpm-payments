@@ -4,6 +4,33 @@ from datetime import datetime
 import json
 import os
 
+USER_DB = {
+    "oreste.cirigliano@juiceplus.com": "Comm2026",
+    "elisa.galimberti@juiceplus.com": "Comm2026",
+    "cristiana.desimoi@juiceplus.com": "Comm2026"
+}
+
+def check_password():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    if st.session_state["authenticated"]:
+        return True
+
+    st.title("🔐 Accesso Riservato")
+    email_input = st.text_input("Email").lower().strip()
+    pass_input = st.text_input("Password", type="password")
+    
+    if st.button("Accedi"):
+        if email_input in USER_DB and USER_DB[email_input] == pass_input:
+            st.session_state["authenticated"] = True
+            st.rerun()
+        else:
+            st.error("Email o Password errati.")
+    return False
+
+if not check_password():
+    st.stop()
+
 from payments.utils import read_and_rename, MONTH_ABBREV
 from payments import gb, ch
 from payments.euro import generate as euro_generate, EURO_COUNTRIES
@@ -27,6 +54,10 @@ st.markdown("""
                  color: white; font-size: 18px; font-weight: bold; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
+
+if st.sidebar.button("Log out"):
+    st.session_state["authenticated"] = False
+    st.rerun()
 
 LOG_FILE = "payment_log.json"
 
