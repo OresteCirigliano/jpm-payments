@@ -28,40 +28,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-import logging
-import os
-from logging.handlers import RotatingFileHandler
+# app.py, righe 31-43
+LOG_FILE = "payment_log.json"  # ← Scritto in directory accessibile!
 
-# Setup logging sicuro
-LOG_DIR = os.environ.get('LOG_DIR', '/var/log/payments')
-os.makedirs(LOG_DIR, exist_ok=True)
-os.chmod(LOG_DIR, 0o700)  # Solo proprietario può leggere
-
-handler = RotatingFileHandler(
-    f'{LOG_DIR}/payment_log.json',
-    maxBytes=10*1024*1024,  # 10 MB
-    backupCount=5,
-    mode='a'
-)
-handler.setLevel(logging.INFO)
-
-logger = logging.getLogger('payments')
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-
-# Salva log in modo sicuro
 def save_log(entry):
-    # Rimuovi dati sensibili dal log
-    safe_entry = {
-        'date': entry['date'],
-        'country': entry['country'],
-        'month': entry['month'],
-        'transactions': entry['transactions'],
-        'status': entry['status'],
-        'anomalies': entry['anomalies'],
-        # NON: 'total', 'input_file', 'output_file'
-    }
-    logger.info(json.dumps(safe_entry))
+    log = load_log()
+    log.insert(0, entry)
+    with open(LOG_FILE, 'w') as f:
+        json.dump(log[:50], f, indent=2)
 
 COUNTRY_OPTIONS = [
     ("🇬🇧 United Kingdom (GB)",  "GB"),
