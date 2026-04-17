@@ -16,16 +16,16 @@ def check_password():
     if st.session_state["authenticated"]:
         return True
 
-    st.title("🔐 Accesso Riservato")
+    st.title("🔐 Log in")
     email_input = st.text_input("Email").lower().strip()
     pass_input = st.text_input("Password", type="password")
     
-    if st.button("Accedi"):
+    if st.button("Log in"):
         if email_input in USER_DB and USER_DB[email_input] == pass_input:
             st.session_state["authenticated"] = True
             st.rerun()
         else:
-            st.error("Email o Password errati.")
+            st.error("Email or Password wrong.")
     return False
 
 if not check_password():
