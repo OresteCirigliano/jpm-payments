@@ -16,7 +16,7 @@ def check_password():
     if st.session_state["authenticated"]:
         return True
 
-    st.title("🔐 Log in")
+    st.title("🔐 Commission File Generator")
     email_input = st.text_input("Email").lower().strip()
     pass_input = st.text_input("Password", type="password")
     
