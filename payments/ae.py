@@ -71,7 +71,7 @@ def generate(df, payment_date, month_full, country_code='AE'):
             [CFG['col_ad']] +                                                                # AD
             [''] * 43 +                                                                      # AE-BU
             [pmt_ref] +                                                                      # BV
-            [''] * 37 +                                                                      # BW-DJ empty
+            [''] * 39 +                                                                      # BW-DJ empty
             [CFG['col_dj']]                                                                  # DJ = OUR
         )
         rows.append(row)
