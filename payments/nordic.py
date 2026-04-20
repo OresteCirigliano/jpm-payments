@@ -1,4 +1,4 @@
-from payments.utils import apply_common_filters
+from payments.utils import apply_common_filters, clean_name
 from openpyxl import Workbook
 import io
 
@@ -31,6 +31,7 @@ def generate(df, payment_date, month_full, country_code):
         iban_or_acct = ('IBAN',        'first'),
     ).reset_index()
     df_g.columns = ['partner_id', 'total_amount', 'deposit_name', 'swift', 'iban_or_acct']
+
     df_g = df_g[df_g['total_amount'] > 0.01]
     df_g['swift']        = df_g['swift'].astype(str).str.strip()
     df_g['iban_or_acct'] = df_g['iban_or_acct'].astype(str).str.strip()
@@ -38,26 +39,41 @@ def generate(df, payment_date, month_full, country_code):
     has_valid_swift_g = ~df_g['swift'].apply(is_empty)
     has_direct_iban_g = df_g['iban_or_acct'].str.upper().str.startswith(country_code)
     df_g = df_g[has_valid_swift_g | has_direct_iban_g]
+
     df_g['amount_cents'] = (df_g['total_amount'] * 100).round().astype(int)
 
     rows = [['FH', cfg['company'], payment_date, '130000', '01100']]
+
     for _, rec in df_g.iterrows():
         pid       = str(rec['partner_id']).strip()
         swift     = str(rec['swift']).strip()
         iban_acct = str(rec['iban_or_acct']).strip()
 
-        if is_empty(swift) or swift[0].isalpha():
+        # If value starts with country prefix → it's an IBAN → F empty, G = IBAN
+        # If value starts with a digit → it's a bank account → F = sort code, G = account
+        # Otherwise → F empty, G = value uppercase
+        if iban_acct.upper().startswith(country_code):
             col_f = ''
             col_g = iban_acct.upper()
-        else:
+        elif iban_acct[0].isdigit() and not is_empty(swift):
             col_f = swift
             col_g = iban_acct
+        else:
+            col_f = ''
+            col_g = iban_acct.upper()
 
         pmt_ref = pid if cfg['pmt_ref'] == 'id_only' else f"{pid}{month_full}Comm"
 
-        tr = ['TR', pid, payment_date, cfg['country'], '', col_f, col_g, '0',
-              rec['amount_cents'], cfg['currency'], 'GIR', '01', cfg['col_m'], cfg['jpm_ref'], '', '',
-              str(rec['deposit_name']).strip()]
+        # Clean name to remove special characters (e.g. ü → ue)
+        name = clean_name(str(rec['deposit_name']))
+
+        tr = [
+            'TR', pid, payment_date, cfg['country'], '',
+            col_f, col_g, '0',
+            rec['amount_cents'], cfg['currency'],
+            'GIR', '01', cfg['col_m'], cfg['jpm_ref'], '', '',
+            name,
+        ]
         tr += [''] * 10
         tr += [pmt_ref]
         rows.append(tr)
@@ -74,6 +90,7 @@ def generate(df, payment_date, month_full, country_code):
             if col_idx in (6, 7) and value not in (None, ''):
                 cell.value = str(value)
                 cell.number_format = '@'
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
