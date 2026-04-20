@@ -49,25 +49,23 @@ def generate(df, payment_date, month_full, country_code):
         swift     = str(rec['swift']).strip()
         iban_acct = str(rec['iban_or_acct']).strip()
 
-        # If value starts with country prefix → it's an IBAN → F empty, G = IBAN
-        # If value starts with a digit → it's a bank account → F = sort code, G = account
-        # Otherwise → F empty, G = value uppercase
-       iban_acct_upper = iban_acct.upper().replace(' ', '')
-        
-        if iban_acct_upper[:2] == country_code:
+        # Strip spaces and check if first 2 chars match country code
+        iban_clean = iban_acct.upper().replace(' ', '')
+
+        if iban_clean[:2] == country_code:
+            # It's an IBAN → F empty, G = IBAN
             col_f = ''
-            col_g = iban_acct_upper
-        elif iban_acct[0].isdigit() and not is_empty(swift):
+            col_g = iban_clean
+        elif len(iban_acct) > 0 and iban_acct[0].isdigit() and not is_empty(swift):
+            # It's a bank account → F = sort code, G = account
             col_f = swift
             col_g = iban_acct
         else:
             col_f = ''
-            col_g = iban_acct_upper
+            col_g = iban_clean
 
         pmt_ref = pid if cfg['pmt_ref'] == 'id_only' else f"{pid}{month_full}Comm"
-
-        # Clean name to remove special characters (e.g. ü → ue)
-        name = clean_name(str(rec['deposit_name']))
+        name    = clean_name(str(rec['deposit_name']))
 
         tr = [
             'TR', pid, payment_date, cfg['country'], '',
