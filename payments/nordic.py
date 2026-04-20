@@ -52,15 +52,17 @@ def generate(df, payment_date, month_full, country_code):
         # If value starts with country prefix → it's an IBAN → F empty, G = IBAN
         # If value starts with a digit → it's a bank account → F = sort code, G = account
         # Otherwise → F empty, G = value uppercase
-        if iban_acct.upper().startswith(country_code):
+       iban_acct_upper = iban_acct.upper().replace(' ', '')
+        
+        if iban_acct_upper[:2] == country_code:
             col_f = ''
-            col_g = iban_acct.upper()
+            col_g = iban_acct_upper
         elif iban_acct[0].isdigit() and not is_empty(swift):
             col_f = swift
             col_g = iban_acct
         else:
             col_f = ''
-            col_g = iban_acct.upper()
+            col_g = iban_acct_upper
 
         pmt_ref = pid if cfg['pmt_ref'] == 'id_only' else f"{pid}{month_full}Comm"
 
