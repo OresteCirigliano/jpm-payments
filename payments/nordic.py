@@ -67,9 +67,10 @@ def generate(df, payment_date, month_full, country_code):
         pmt_ref = pid if cfg['pmt_ref'] == 'id_only' else f"{pid}{month_full}Comm"
         name    = clean_name(str(rec['deposit_name']))
 
+        zero_flag = '0' if country_code == 'DK' else ''
         tr = [
             'TR', pid, payment_date, cfg['country'], '',
-            col_f, col_g, '0',
+            col_f, col_g, zero_flag,
             rec['amount_cents'], cfg['currency'],
             'GIR', '01', cfg['col_m'], cfg['jpm_ref'], '', '',
             name,
