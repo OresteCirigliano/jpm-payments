@@ -7,7 +7,8 @@ import os
 USER_DB = {
     "oreste.cirigliano@juiceplus.com": "Comm2026",
     "elisa.galimberti@juiceplus.com": "Comm2026",
-    "cristiana.desimoi@juiceplus.com": "Comm2026"
+    "cristiana.desimoi@juiceplus.com": "Comm2026",
+    "adrian.divita@juiceplus.com": "Comm2026"
 }
 
 def check_password():
